@@ -14,45 +14,60 @@ namespace TPLab3
 {
     public partial class MainForm : Form
     {
+        // Путь к текущему открытому CSV-файлу
         private string currentFilePath;
 
         public MainForm()
         {
-            InitializeComponent();
+            InitializeComponent(); // Инициализация компонентов формы (создаётся дизайнером)
         }
 
+        // Обработчик кнопки "Загрузить файл"
+        // Загружает CSV-файл, отображает его в таблице и строит график с анализом
         private void button1_Click(object sender, EventArgs e)
         {
-            OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "CSV files (*.csv)|*.csv";
+            OpenFileDialog openFileDialog = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv" // Ограничиваем выбор файла только .csv
+            };
+
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
                 currentFilePath = openFileDialog.FileName;
-                string[] lines = File.ReadAllLines(currentFilePath);
-                LoadDataToGrid(lines);
-                PlotChart(lines);
-                AnalyzeTrends(lines);
+                string[] lines = File.ReadAllLines(currentFilePath); // Чтение всех строк файла
+
+                LoadDataToGrid(lines);   // Отображение данных в таблице
+                PlotChart(lines);        // Построение графика
+                AnalyzeTrends(lines);    // Анализ изменений цен за период
             }
         }
 
+        // Заполняет DataGridView значениями из CSV-файла
+        // Предполагается, что первая строка содержит заголовки
         private void LoadDataToGrid(string[] lines)
         {
             dataGridView1.Columns.Clear();
+
             string[] headers = lines[0].Split(',');
+
+            // Создание колонок по заголовкам
             foreach (string header in headers)
             {
                 dataGridView1.Columns.Add(header, header);
             }
 
+            // Добавление строк с данными, начиная со второй строки
             for (int i = 1; i < lines.Length; i++)
             {
                 dataGridView1.Rows.Add(lines[i].Split(','));
             }
         }
 
+        // Строит линейный график на основе значений из CSV
+        // Ось X — годы, ось Y — цены
         private void PlotChart(string[] lines)
         {
-            chart1.Series.Clear();
+            chart1.Series.Clear(); // Очищаем старые данные графика
             chart1.ChartAreas[0].AxisX.Interval = 1;
             chart1.ChartAreas[0].AxisX.Title = "Год";
             chart1.ChartAreas[0].AxisY.Title = "Цена за 1 кв.м";
@@ -60,16 +75,19 @@ namespace TPLab3
 
             string[] headers = lines[0].Split(',');
 
+            // Для каждого региона/категории создаём отдельную линию
             for (int col = 1; col < headers.Length; col++)
             {
                 var series = chart1.Series.Add(headers[col]);
-                series.ChartType = System.Windows.Forms.DataVisualization.Charting.SeriesChartType.Line;
+                series.ChartType = SeriesChartType.Line;
                 series.BorderWidth = 2;
                 series.LegendText = headers[col];
 
+                // Добавляем значения по годам
                 for (int row = 1; row < lines.Length; row++)
                 {
                     string[] values = lines[row].Split(',');
+
                     if (int.TryParse(values[0], out int year) && double.TryParse(values[col], out double price))
                     {
                         series.Points.AddXY(year, price);
@@ -78,12 +96,15 @@ namespace TPLab3
             }
         }
 
+        // Анализирует рост/падение цен между первым и последним годом
+        // Результат — самый большой рост и самое большое падение
         private void AnalyzeTrends(string[] lines)
         {
             listBox1.Items.Clear();
+
             string[] headers = lines[0].Split(',');
-            string[] first = lines[1].Split(',');
-            string[] last = lines[lines.Length - 1].Split(',');
+            string[] first = lines[1].Split(',');                     // Первая запись (начальный год)
+            string[] last = lines[lines.Length - 1].Split(',');      // Последняя запись (последний год)
 
             double maxPercent = double.MinValue;
             double minPercent = double.MaxValue;
@@ -92,7 +113,9 @@ namespace TPLab3
 
             for (int i = 1; i < headers.Length; i++)
             {
-                if (double.TryParse(first[i], out double firstVal) && double.TryParse(last[i], out double lastVal) && firstVal != 0)
+                if (double.TryParse(first[i], out double firstVal) &&
+                    double.TryParse(last[i], out double lastVal) &&
+                    firstVal != 0)
                 {
                     double absDiff = lastVal - firstVal;
                     double percentDiff = absDiff / firstVal * 100;
@@ -111,57 +134,60 @@ namespace TPLab3
                 }
             }
 
+            // Отображаем результат анализа
             listBox1.Items.Add($"Сильнее всего подорожали: {mostIncreased}");
             listBox1.Items.Add($"Сильнее всего подешевели: {mostDecreased}");
         }
 
+        // Выполняет прогноз цен на заданное количество лет вперёд
+        // Используется метод скользящего среднего
         private void ForecastPrices(string[] lines, int yearsToForecast)
         {
-            // Удаляем старые прогнозные серии
+            // Удаляем предыдущие прогнозы (поиск по названию)
             foreach (var s in chart1.Series.Cast<Series>().Where(s => s.Name.Contains("(прогноз)")).ToList())
             {
                 chart1.Series.Remove(s);
             }
 
             string[] headers = lines[0].Split(',');
-            int smoothing = (int)numericUpDown1.Value;
-
-            chart1.ChartAreas[0].RecalculateAxesScale();
-            chart1.ChartAreas[0].AxisX.Title = "Год";
-            chart1.ChartAreas[0].AxisY.Title = "Цена за 1 кв.м";
+            int smoothing = (int)numericUpDown1.Value; // Период сглаживания
 
             double globalMin = double.MaxValue;
             double globalMax = double.MinValue;
 
             for (int col = 1; col < headers.Length; col++)
             {
+                // Получаем значения цен и соответствующие годы
                 List<double> prices = lines.Skip(1).Select(l => double.Parse(l.Split(',')[col])).ToList();
                 List<int> years = lines.Skip(1).Select(l => int.Parse(l.Split(',')[0])).ToList();
 
+                // Проверка корректности параметра сглаживания
                 if (smoothing <= 0 || smoothing > prices.Count)
                 {
                     MessageBox.Show($"Некорректное значение сглаживания для {headers[col]}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     continue;
                 }
 
+                // Создание серии для прогноза
                 var forecastSeries = new Series
                 {
-                    Name = $"Прогноз {col}",
+                    Name = $"Прогноз {col} (прогноз)",
                     ChartType = SeriesChartType.Line,
-                    BorderDashStyle = ChartDashStyle.Dash,
+                    BorderDashStyle = ChartDashStyle.Dash, // Линия прогноза — пунктир
                     Color = Color.Red,
                     BorderWidth = 2,
-                    LegendText = $"Прогноз {col}"
+                    LegendText = $"Прогноз {headers[col]}"
                 };
 
-                // Добавим последнюю известную точку
+                // Добавляем последнюю известную точку
                 forecastSeries.Points.AddXY(years.Last(), prices.Last());
 
-                // Прогнозирование
                 int lastYear = years.Last();
+
+                // Прогноз на N лет вперёд
                 for (int i = 0; i < yearsToForecast; i++)
                 {
-                    double avg = prices.Skip(prices.Count - smoothing).Take(smoothing).Average();
+                    double avg = prices.Skip(prices.Count - smoothing).Take(smoothing).Average(); // Скользящее среднее
                     prices.Add(avg);
                     int nextYear = lastYear + i + 1;
                     forecastSeries.Points.AddXY(nextYear, avg);
@@ -169,23 +195,23 @@ namespace TPLab3
 
                 chart1.Series.Add(forecastSeries);
 
-                // Обновим глобальные мин/макс для масштабирования осей
+                // Обновляем диапазон значений оси Y
                 globalMin = Math.Min(globalMin, prices.Min());
                 globalMax = Math.Max(globalMax, prices.Max());
             }
 
-            // Красивое масштабирование оси Y
+            // Устанавливаем оси графика с небольшим отступом
             double padding = (globalMax - globalMin) * 0.1;
             chart1.ChartAreas[0].AxisY.Minimum = Math.Floor(globalMin - padding);
             chart1.ChartAreas[0].AxisY.Maximum = Math.Ceiling(globalMax + padding);
             chart1.ChartAreas[0].AxisY.Interval = Math.Ceiling((chart1.ChartAreas[0].AxisY.Maximum - chart1.ChartAreas[0].AxisY.Minimum) / 10);
             chart1.ChartAreas[0].AxisY.IsStartedFromZero = false;
-
-            // Повернём подписи оси X
             chart1.ChartAreas[0].AxisX.Interval = 1;
             chart1.ChartAreas[0].AxisX.LabelStyle.Angle = -45;
         }
 
+        // Обработчик кнопки "Прогнозировать"
+        // Проверяет корректность ввода и запускает прогноз
         private void button2_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(currentFilePath) || string.IsNullOrWhiteSpace(numericUpDown1.Text))
@@ -201,7 +227,7 @@ namespace TPLab3
             }
 
             string[] lines = File.ReadAllLines(currentFilePath);
-            ForecastPrices(lines, yearsToForecast);
+            ForecastPrices(lines, yearsToForecast); // Запуск прогноза
         }
     }
 }
