@@ -17,9 +17,26 @@ namespace TPLab3
         // Путь к текущему открытому CSV-файлу
         private string currentFilePath;
 
+        private enum DataType
+        {
+            Housing,
+            Inflation
+        }
+
+        private DataType selectedDataType;
+
         public MainForm()
         {
-            InitializeComponent(); // Инициализация компонентов формы (создаётся дизайнером)
+            InitializeComponent();
+
+            comboBox1.Items.Add("Цены на жильё");
+            comboBox1.Items.Add("Инфляция");
+            comboBox1.SelectedIndex = 0;
+            selectedDataType = DataType.Housing;
+            comboBox1.SelectedIndexChanged += (s, e) =>
+            {
+                selectedDataType = (DataType)comboBox1.SelectedIndex;
+            };
         }
 
         // Обработчик кнопки "Загрузить файл"
