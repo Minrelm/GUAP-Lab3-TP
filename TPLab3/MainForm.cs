@@ -112,7 +112,7 @@ namespace TPLab3
             chart1.ChartAreas[0].AxisY.Interval = Double.NaN;
             chart1.ChartAreas[0].AxisX.Interval = 1;
             chart1.ChartAreas[0].AxisX.Title = "Год";
-            chart1.ChartAreas[0].AxisY.Title = "Цена за 1 кв.м";
+            chart1.ChartAreas[0].AxisY.Title = "Значение";
             chart1.ChartAreas[0].AxisX.LabelStyle.Angle = -45;
 
             string[] headers = lines[0].Split(',');
