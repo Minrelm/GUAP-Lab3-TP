@@ -48,6 +48,11 @@ namespace TPLab3
                 numericPrice.Visible = IsInflation;
                 labelPrice.Enabled = IsInflation;
                 labelPrice.Visible = IsInflation;
+
+                listBox1.Items.Clear();          // ОЧИСТКА
+                chart1.Series.Clear();           // очистка графика тоже по желанию
+                dataGridView1.Rows.Clear();      // очистка таблицы
+                dataGridView1.Columns.Clear();
             };
         }
 
