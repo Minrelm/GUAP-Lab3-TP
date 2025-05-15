@@ -49,9 +49,9 @@ namespace TPLab3
                 labelPrice.Enabled = IsInflation;
                 labelPrice.Visible = IsInflation;
 
-                listBox1.Items.Clear();          // ОЧИСТКА
-                chart1.Series.Clear();           // очистка графика тоже по желанию
-                dataGridView1.Rows.Clear();      // очистка таблицы
+                listBox1.Items.Clear();    
+                chart1.Series.Clear();   
+                dataGridView1.Rows.Clear(); 
                 dataGridView1.Columns.Clear();
             };
         }
@@ -182,64 +182,92 @@ namespace TPLab3
         // Используется метод скользящего среднего
         private void ForecastPrices(string[] lines, int yearsToForecast)
         {
-            // Удаляем предыдущие прогнозы (поиск по названию)
+            // Удаляем предыдущие прогнозы
             foreach (var s in chart1.Series.Cast<Series>().Where(s => s.Name.Contains("(прогноз)")).ToList())
             {
                 chart1.Series.Remove(s);
             }
 
+            if (lines == null || lines.Length < 2)
+            {
+                MessageBox.Show("Недостаточно данных для построения прогноза.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
             string[] headers = lines[0].Split(',');
-            int smoothing = (int)numericUpDown1.Value; // Период сглаживания
+            int smoothing;
+
+            try
+            {
+                smoothing = (int)numericUpDown1.Value;
+            }
+            catch
+            {
+                MessageBox.Show("Некорректное значение сглаживания.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (smoothing <= 0)
+            {
+                MessageBox.Show("Сглаживание должно быть положительным числом.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
             double globalMin = double.MaxValue;
             double globalMax = double.MinValue;
 
             for (int col = 1; col < headers.Length; col++)
             {
-                // Получаем значения цен и соответствующие годы
-                List<double> prices = lines.Skip(1).Select(l => double.Parse(l.Split(',')[col])).ToList();
-                List<int> years = lines.Skip(1).Select(l => int.Parse(l.Split(',')[0])).ToList();
+                List<double> prices;
+                List<int> years;
 
-                // Проверка корректности параметра сглаживания
-                if (smoothing <= 0 || smoothing > prices.Count)
+                try
                 {
-                    MessageBox.Show($"Некорректное значение сглаживания для {headers[col]}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    prices = lines.Skip(1).Select(l => double.Parse(l.Split(',')[col])).ToList();
+                    years = lines.Skip(1).Select(l => int.Parse(l.Split(',')[0])).ToList();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка при чтении данных для {headers[col]}: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     continue;
                 }
 
-                // Создание серии для прогноза
+                if (smoothing > prices.Count)
+                {
+                    MessageBox.Show($"Сглаживание превышает количество данных для {headers[col]}.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    continue;
+                }
+
+                // Создаём прогнозную серию
                 var forecastSeries = new Series
                 {
                     Name = $"Прогноз {col} (прогноз)",
                     ChartType = SeriesChartType.Line,
-                    BorderDashStyle = ChartDashStyle.Dash, // Линия прогноза — пунктир
+                    BorderDashStyle = ChartDashStyle.Dash,
                     Color = Color.Red,
                     BorderWidth = 2,
                     LegendText = $"Прогноз {headers[col]}"
                 };
 
-                // Добавляем последнюю известную точку
                 forecastSeries.Points.AddXY(years.Last(), prices.Last());
-
                 int lastYear = years.Last();
 
-                // Прогноз на N лет вперёд
                 for (int i = 0; i < yearsToForecast; i++)
                 {
-                    double avg = prices.Skip(prices.Count - smoothing).Take(smoothing).Average(); // Скользящее среднее
+                    double avg = prices.Skip(prices.Count - smoothing).Take(smoothing).Average();
                     prices.Add(avg);
-                    int nextYear = lastYear + i + 1;
-                    forecastSeries.Points.AddXY(nextYear, avg);
+                    forecastSeries.Points.AddXY(lastYear + i + 1, avg);
                 }
 
                 chart1.Series.Add(forecastSeries);
 
-                // Обновляем диапазон значений оси Y
                 globalMin = Math.Min(globalMin, prices.Min());
                 globalMax = Math.Max(globalMax, prices.Max());
             }
 
-            // Устанавливаем оси графика с небольшим отступом
+            if (globalMin == double.MaxValue || globalMax == double.MinValue)
+                return;
+
             double padding = (globalMax - globalMin) * 0.1;
             chart1.ChartAreas[0].AxisY.Minimum = Math.Floor(globalMin - padding);
             chart1.ChartAreas[0].AxisY.Maximum = Math.Ceiling(globalMax + padding);
@@ -257,22 +285,53 @@ namespace TPLab3
                 chart1.Series.Remove(s);
             }
 
+            if (lines == null || lines.Length < 2)
+            {
+                MessageBox.Show("Недостаточно данных для построения прогноза.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
             string[] headers = lines[0].Split(',');
-            int smoothing = (int)numericUpDown1.Value; // Период сглаживания
+            int smoothing;
+
+            try
+            {
+                smoothing = (int)numericUpDown1.Value;
+            }
+            catch
+            {
+                MessageBox.Show("Некорректное значение сглаживания.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (smoothing <= 0)
+            {
+                MessageBox.Show("Сглаживание должно быть положительным числом.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
             double globalMin = double.MaxValue;
             double globalMax = double.MinValue;
 
             for (int col = 1; col < headers.Length; col++)
             {
-                // Получаем значения цен и соответствующие годы
-                List<double> prices = lines.Skip(1).Select(l => double.Parse(l.Split(',')[col])).ToList();
-                List<int> years = lines.Skip(1).Select(l => int.Parse(l.Split(',')[0])).ToList();
+                List<double> prices;
+                List<int> years;
 
-                // Проверка корректности параметра сглаживания
-                if (smoothing <= 0 || smoothing > prices.Count)
+                try
                 {
-                    MessageBox.Show($"Некорректное значение сглаживания для {headers[col]}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    prices = lines.Skip(1).Select(l => double.Parse(l.Split(',')[col])).ToList();
+                    years = lines.Skip(1).Select(l => int.Parse(l.Split(',')[0])).ToList();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка при чтении данных для {headers[col]}: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    continue;
+                }
+
+                if (smoothing > prices.Count)
+                {
+                    MessageBox.Show($"Сглаживание превышает количество данных для {headers[col]}.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     continue;
                 }
 
@@ -281,45 +340,50 @@ namespace TPLab3
                 {
                     Name = $"Прогноз {col} (прогноз)",
                     ChartType = SeriesChartType.Line,
-                    BorderDashStyle = ChartDashStyle.Dash, // Линия прогноза — пунктир
+                    BorderDashStyle = ChartDashStyle.Dash,
                     Color = Color.Red,
                     BorderWidth = 2,
                     LegendText = $"Прогноз {headers[col]}"
                 };
 
-                // Добавляем последнюю известную точку
                 forecastSeries.Points.AddXY(years.Last(), prices.Last());
-
                 int lastYear = years.Last();
 
-                // Прогноз на N лет вперёд
                 for (int i = 0; i < yearsToForecast; i++)
                 {
-                    double avg = prices.Skip(prices.Count - smoothing).Take(smoothing).Average(); // Скользящее среднее
+                    double avg = prices.Skip(prices.Count - smoothing).Take(smoothing).Average();
                     prices.Add(avg);
-                    int nextYear = lastYear + i + 1;
-                    forecastSeries.Points.AddXY(nextYear, avg);
+                    forecastSeries.Points.AddXY(lastYear + i + 1, avg);
                 }
 
                 chart1.Series.Add(forecastSeries);
 
-                // Обновляем диапазон значений оси Y
                 globalMin = Math.Min(globalMin, prices.Min());
                 globalMax = Math.Max(globalMax, prices.Max());
 
-                listBox1.Items.Clear();
-                double initialPrice = (int)numericPrice.Value;
-                double adjustedPrice = initialPrice;
-                foreach (var inflat in prices.Skip(prices.Count - smoothing))
+                try
                 {
-                    double rate = inflat / 100; // переводим проценты в десятичное значение
-                    adjustedPrice *= (1 + rate);
+                    listBox1.Items.Clear();
+                    double initialPrice = (double)numericPrice.Value;
+                    double adjustedPrice = initialPrice;
+                    foreach (var inflat in prices.Skip(prices.Count - smoothing))
+                    {
+                        double rate = inflat / 100;
+                        adjustedPrice *= (1 + rate);
+                    }
+                    adjustedPrice = Math.Round(adjustedPrice, 2);
+                    listBox1.Items.Add($"Цена услуги в {years.Last()} с учетом инфляции: {adjustedPrice}");
                 }
-                adjustedPrice = Math.Round(adjustedPrice, 2);
-                listBox1.Items.Add($"Цена услуги в {years.Last()} с учетом инфляции: {adjustedPrice}");
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка при расчёте инфляции: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
 
-            // Устанавливаем оси графика с небольшим отступом
+            if (globalMin == double.MaxValue || globalMax == double.MinValue)
+                return;
+
+            // Настройка осей графика
             double padding = (globalMax - globalMin) * 0.1;
             chart1.ChartAreas[0].AxisY.Minimum = Math.Floor(globalMin - padding);
             chart1.ChartAreas[0].AxisY.Maximum = Math.Ceiling(globalMax + padding);
