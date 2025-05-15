@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
+using System.Diagnostics;
 
 namespace TPLab3
 {
@@ -28,14 +29,25 @@ namespace TPLab3
         public MainForm()
         {
             InitializeComponent();
-
-            comboBox1.Items.Add("Цены на жильё");
-            comboBox1.Items.Add("Инфляция");
-            comboBox1.SelectedIndex = 0;
+            numericPrice.Minimum = 0;
+            numericPrice.Maximum = 1000000;
+            numericPrice.Enabled = false;
+            numericPrice.Visible = false;
+            labelPrice.Enabled = false;
+            labelPrice.Visible = false;
+            comboMode.Items.Add("Цены на жильё");
+            comboMode.Items.Add("Инфляция");
+            comboMode.SelectedIndex = 0;
             selectedDataType = DataType.Housing;
-            comboBox1.SelectedIndexChanged += (s, e) =>
+            comboMode.SelectedIndexChanged += (s, e) =>
             {
-                selectedDataType = (DataType)comboBox1.SelectedIndex;
+                selectedDataType = (DataType)comboMode.SelectedIndex;
+                bool IsInflation = selectedDataType == DataType.Inflation;
+                numericPrice.Enabled = IsInflation;
+                numericPrice.Value = 0;
+                numericPrice.Visible = IsInflation;
+                labelPrice.Enabled = IsInflation;
+                labelPrice.Visible = IsInflation;
             };
         }
 
@@ -45,17 +57,22 @@ namespace TPLab3
         {
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
-                Filter = "CSV files (*.csv)|*.csv" // Ограничиваем выбор файла только .csv
+                Filter = "CSV files (*.csv)|*.csv"
             };
-
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            if (openFileDialog.ShowDialog() != DialogResult.OK)
+                return;
+            currentFilePath = openFileDialog.FileName;
+            var lines = File.ReadAllLines(currentFilePath);
+            switch (selectedDataType)
             {
-                currentFilePath = openFileDialog.FileName;
-                string[] lines = File.ReadAllLines(currentFilePath); // Чтение всех строк файла
-
-                LoadDataToGrid(lines);   // Отображение данных в таблице
-                PlotChart(lines);        // Построение графика
-                AnalyzeTrends(lines);    // Анализ изменений цен за период
+                case DataType.Housing:
+                    LoadDataToGrid(lines);
+                    PlotChart(lines); AnalyzeTrends(lines);
+                    break;
+                case DataType.Inflation:
+                    LoadDataToGrid(lines);
+                    PlotChart(lines);
+                    break;
             }
         }
 
@@ -227,6 +244,86 @@ namespace TPLab3
             chart1.ChartAreas[0].AxisX.LabelStyle.Angle = -45;
         }
 
+        private void ForecastInflat(string[] lines, int yearsToForecast)
+        {
+            // Удаляем предыдущие прогнозы (поиск по названию)
+            foreach (var s in chart1.Series.Cast<Series>().Where(s => s.Name.Contains("(прогноз)")).ToList())
+            {
+                chart1.Series.Remove(s);
+            }
+
+            string[] headers = lines[0].Split(',');
+            int smoothing = (int)numericUpDown1.Value; // Период сглаживания
+
+            double globalMin = double.MaxValue;
+            double globalMax = double.MinValue;
+
+            for (int col = 1; col < headers.Length; col++)
+            {
+                // Получаем значения цен и соответствующие годы
+                List<double> prices = lines.Skip(1).Select(l => double.Parse(l.Split(',')[col])).ToList();
+                List<int> years = lines.Skip(1).Select(l => int.Parse(l.Split(',')[0])).ToList();
+
+                // Проверка корректности параметра сглаживания
+                if (smoothing <= 0 || smoothing > prices.Count)
+                {
+                    MessageBox.Show($"Некорректное значение сглаживания для {headers[col]}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    continue;
+                }
+
+                // Создание серии для прогноза
+                var forecastSeries = new Series
+                {
+                    Name = $"Прогноз {col} (прогноз)",
+                    ChartType = SeriesChartType.Line,
+                    BorderDashStyle = ChartDashStyle.Dash, // Линия прогноза — пунктир
+                    Color = Color.Red,
+                    BorderWidth = 2,
+                    LegendText = $"Прогноз {headers[col]}"
+                };
+
+                // Добавляем последнюю известную точку
+                forecastSeries.Points.AddXY(years.Last(), prices.Last());
+
+                int lastYear = years.Last();
+
+                // Прогноз на N лет вперёд
+                for (int i = 0; i < yearsToForecast; i++)
+                {
+                    double avg = prices.Skip(prices.Count - smoothing).Take(smoothing).Average(); // Скользящее среднее
+                    prices.Add(avg);
+                    int nextYear = lastYear + i + 1;
+                    forecastSeries.Points.AddXY(nextYear, avg);
+                }
+
+                chart1.Series.Add(forecastSeries);
+
+                // Обновляем диапазон значений оси Y
+                globalMin = Math.Min(globalMin, prices.Min());
+                globalMax = Math.Max(globalMax, prices.Max());
+
+                listBox1.Items.Clear();
+                double initialPrice = (int)numericPrice.Value;
+                double adjustedPrice = initialPrice;
+                foreach (var inflat in prices.Skip(prices.Count - smoothing))
+                {
+                    double rate = inflat / 100; // переводим проценты в десятичное значение
+                    adjustedPrice *= (1 + rate);
+                }
+                adjustedPrice = Math.Round(adjustedPrice, 2);
+                listBox1.Items.Add($"Цена услуги в {years.Last()} с учетом инфляции: {adjustedPrice}");
+            }
+
+            // Устанавливаем оси графика с небольшим отступом
+            double padding = (globalMax - globalMin) * 0.1;
+            chart1.ChartAreas[0].AxisY.Minimum = Math.Floor(globalMin - padding);
+            chart1.ChartAreas[0].AxisY.Maximum = Math.Ceiling(globalMax + padding);
+            chart1.ChartAreas[0].AxisY.Interval = Math.Ceiling((chart1.ChartAreas[0].AxisY.Maximum - chart1.ChartAreas[0].AxisY.Minimum) / 10);
+            chart1.ChartAreas[0].AxisY.IsStartedFromZero = false;
+            chart1.ChartAreas[0].AxisX.Interval = 1;
+            chart1.ChartAreas[0].AxisX.LabelStyle.Angle = -45;
+        }
+
         // Обработчик кнопки "Прогнозировать"
         // Проверяет корректность ввода и запускает прогноз
         private void button2_Click(object sender, EventArgs e)
@@ -244,7 +341,16 @@ namespace TPLab3
             }
 
             string[] lines = File.ReadAllLines(currentFilePath);
-            ForecastPrices(lines, yearsToForecast); // Запуск прогноза
+            switch (selectedDataType)
+            {
+                case DataType.Housing:
+                    ForecastPrices(lines, yearsToForecast); // Запуск прогноза
+                    break;
+                case DataType.Inflation:
+                    ForecastInflat(lines, yearsToForecast);
+                    break;
+            }
+            
         }
     }
 }
