@@ -107,6 +107,9 @@ namespace TPLab3
         private void PlotChart(string[] lines)
         {
             chart1.Series.Clear(); // Очищаем старые данные графика
+            chart1.ChartAreas[0].AxisY.Minimum = Double.NaN;
+            chart1.ChartAreas[0].AxisY.Maximum = Double.NaN;
+            chart1.ChartAreas[0].AxisY.Interval = Double.NaN;
             chart1.ChartAreas[0].AxisX.Interval = 1;
             chart1.ChartAreas[0].AxisX.Title = "Год";
             chart1.ChartAreas[0].AxisY.Title = "Цена за 1 кв.м";
