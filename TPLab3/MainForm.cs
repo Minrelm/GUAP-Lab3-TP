@@ -594,7 +594,7 @@ namespace TPLab3
 
             double globalMin = double.MaxValue;
             double globalMax = double.MinValue;
-
+                
             for (int col = 1; col < headers.Length; col++)
             {
                 List<double> values;
