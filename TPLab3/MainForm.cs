@@ -446,9 +446,6 @@ namespace TPLab3
                 case DataType.Inflation:
                     ForecastInflat(lines, yearsToForecast);
                     break;
-                case DataType.Marriage:
-                    ForecastMarriage(lines, yearsToForecast);
-                    break;
             }
         }
         private void AnalyzeMarriageTrends(string[] lines)
