@@ -381,9 +381,10 @@ namespace TPLab3
                 {
                     double avg = prices.Skip(prices.Count - smoothing).Take(smoothing).Average();
                     prices.Add(avg);
-                    forecastSeries.Points.AddXY(lastYear + i + 1, avg);
+                    lastYear += 1;
+                    forecastSeries.Points.AddXY(lastYear + 1, avg);
                 }
-
+                lastYear += 1;
                 chart1.Series.Add(forecastSeries);
 
                 globalMin = Math.Min(globalMin, prices.Min());
@@ -400,7 +401,7 @@ namespace TPLab3
                         adjustedPrice *= (1 + rate);
                     }
                     adjustedPrice = Math.Round(adjustedPrice, 2);
-                    listBox1.Items.Add($"Цена услуги в {years.Last()} с учетом инфляции: {adjustedPrice}");
+                    listBox1.Items.Add($"Цена услуги в {lastYear} с учетом инфляции: {adjustedPrice}");
                 }
                 catch (Exception ex)
                 {
