@@ -446,6 +446,9 @@ namespace TPLab3
                 case DataType.Inflation:
                     ForecastInflat(lines, yearsToForecast);
                     break;
+                case DataType.Marriage:
+                    ForecastMarriage(lines, yearsToForecast);
+                    break;
             }
         }
         private void AnalyzeMarriageTrends(string[] lines)
@@ -511,12 +514,6 @@ namespace TPLab3
 
             string mostCommonMenDivorceGroup = FindGroupWithHighestTotal(menGroups, totalDivorcesByGroup);
             string mostCommonWomenDivorceGroup = FindGroupWithHighestTotal(womenGroups, totalDivorcesByGroup);
-
-
-            listBox1.Items.Add($"Чаще всего женились мужчины: {mostCommonMenMarriageGroup}");
-            listBox1.Items.Add($"Чаще всего выходили замуж женщины: {mostCommonWomenMarriageGroup}");
-            listBox1.Items.Add($"Чаще всего разводились мужчины: {mostCommonMenDivorceGroup}");
-            listBox1.Items.Add($"Чаще всего разводились женщины: {mostCommonWomenDivorceGroup}");
 
            
 
