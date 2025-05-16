@@ -68,17 +68,32 @@ namespace TPLab3
                 return;
             currentFilePath = openFileDialog.FileName;
             var lines = File.ReadAllLines(currentFilePath);
-            switch (selectedDataType)
+            string headers = lines[0];
+            if ((selectedDataType == DataType.Housing && headers == "Год,1-комн/цена за 1 кв.м,2-комн/цена за 1 кв.м,3-комн/цена за 1 кв.м") || (selectedDataType == DataType.Inflation && headers == "Год,Уровень инфляции"))
             {
-                case DataType.Housing:
-                    LoadDataToGrid(lines);
-                    PlotChart(lines); AnalyzeTrends(lines);
-                    break;
-                case DataType.Inflation:
-                    LoadDataToGrid(lines);
-                    PlotChart(lines);
-                    break;
+                switch (selectedDataType)
+                {
+                    case DataType.Housing:
+                        LoadDataToGrid(lines);
+                        PlotChart(lines); AnalyzeTrends(lines);
+                        break;
+                    case DataType.Inflation:
+                        LoadDataToGrid(lines);
+                        PlotChart(lines);
+                        break;
+                }
             }
+            else
+            {
+                MessageBox.Show("Загружены неверные данные", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                lines = null;
+                currentFilePath = null;
+                listBox1.Items.Clear();
+                chart1.Series.Clear();
+                dataGridView1.Rows.Clear();
+                dataGridView1.Columns.Clear();
+            }
+            
         }
 
         // Заполняет DataGridView значениями из CSV-файла
