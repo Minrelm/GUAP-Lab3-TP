@@ -21,7 +21,8 @@ namespace TPLab3
         private enum DataType
         {
             Housing,
-            Inflation
+            Inflation,
+            Marriage
         }
 
         private DataType selectedDataType;
@@ -37,6 +38,7 @@ namespace TPLab3
             labelPrice.Visible = false;
             comboMode.Items.Add("Цены на жильё");
             comboMode.Items.Add("Инфляция");
+            comboMode.Items.Add("Браки и Разводы");
             comboMode.SelectedIndex = 0;
             selectedDataType = DataType.Housing;
             comboMode.SelectedIndexChanged += (s, e) =>
@@ -69,17 +71,25 @@ namespace TPLab3
             currentFilePath = openFileDialog.FileName;
             var lines = File.ReadAllLines(currentFilePath);
             string headers = lines[0];
-            if ((selectedDataType == DataType.Housing && headers == "Год,1-комн/цена за 1 кв.м,2-комн/цена за 1 кв.м,3-комн/цена за 1 кв.м") || (selectedDataType == DataType.Inflation && headers == "Год,Уровень инфляции"))
+            if ((selectedDataType == DataType.Housing && headers == "Год,1-комн/цена за 1 кв.м,2-комн/цена за 1 кв.м,3-комн/цена за 1 кв.м") ||
+     (selectedDataType == DataType.Inflation && headers == "Год,Уровень инфляции") ||
+     (selectedDataType == DataType.Marriage && headers == "Год,Мужчины 20-29,Мужчины 30-39,Мужчины 40-49,Женщины 20-29,Женщины 30-39,Женщины 40-49"))
             {
                 switch (selectedDataType)
                 {
                     case DataType.Housing:
                         LoadDataToGrid(lines);
-                        PlotChart(lines); AnalyzeTrends(lines);
+                        PlotChart(lines);
+                        AnalyzeTrends(lines);
                         break;
                     case DataType.Inflation:
                         LoadDataToGrid(lines);
                         PlotChart(lines);
+                        break;
+                    case DataType.Marriage:
+                        LoadDataToGrid(lines);
+                        PlotChart(lines);
+                        AnalyzeMarriageTrends(lines); 
                         break;
                 }
             }
@@ -431,13 +441,222 @@ namespace TPLab3
             switch (selectedDataType)
             {
                 case DataType.Housing:
-                    ForecastPrices(lines, yearsToForecast); // Запуск прогноза
+                    ForecastPrices(lines, yearsToForecast);
                     break;
                 case DataType.Inflation:
                     ForecastInflat(lines, yearsToForecast);
                     break;
+                case DataType.Marriage:
+                    ForecastMarriage(lines, yearsToForecast);
+                    break;
             }
-            
+        }
+        // Анализирует тенденции браков и разводов и вычисляет, в каком возрасте мужчины и женщины чаще всего вступали в брак и разводились
+        private void AnalyzeMarriageTrends(string[] lines)
+        {
+            listBox1.Items.Clear();
+
+            string[] headers = lines[0].Split(',');
+            // Словари для хранения данных о браках и разводах по возрастным группам
+            Dictionary<string, List<double>> valuesByGroup = new Dictionary<string, List<double>>();
+            Dictionary<string, List<double>> divorcesByGroup = new Dictionary<string, List<double>>();
+            Dictionary<string, int> totalDivorcesByGroup = new Dictionary<string, int>();
+            // Инициализация словарей для каждой возрастной группы
+            for (int i = 1; i < headers.Length; i++)
+            {
+                valuesByGroup[headers[i]] = new List<double>();
+                divorcesByGroup[headers[i]] = new List<double>();
+                totalDivorcesByGroup[headers[i]] = 0;
+            }
+
+            List<int> years = new List<int>();
+            // Заполнение словарей данными из CSV
+            for (int row = 1; row < lines.Length; row++)
+            {
+                string[] values = lines[row].Split(',');
+
+                if (int.TryParse(values[0], out int year))
+                    years.Add(year);
+
+                for (int col = 1; col < values.Length && col < headers.Length; col++)
+                {
+                    if (double.TryParse(values[col], out double value))
+                        valuesByGroup[headers[col]].Add(value);
+                }
+            }
+            // Расчет данных о разводах: считаем, что если количество браков уменьшилось,
+            for (int i = 1; i < years.Count; i++)
+            {
+                foreach (var group in valuesByGroup.Keys)
+                {
+                    double prevYear = valuesByGroup[group][i - 1];
+                    double currentYear = valuesByGroup[group][i];
+                    // Если количество браков уменьшилось по сравнению с предыдущим годом,
+                    if (currentYear < prevYear)
+                    {
+                        double divorces = prevYear - currentYear;
+                        divorcesByGroup[group].Add(divorces);
+                        totalDivorcesByGroup[group] += (int)divorces;
+                    }
+                    else
+                    {
+                        divorcesByGroup[group].Add(0);
+                    }
+                }
+            }
+
+            // Разделение данных на группы по полу
+            List<string> menGroups = headers.Where(h => h.StartsWith("Мужчины")).ToList();
+            List<string> womenGroups = headers.Where(h => h.StartsWith("Женщины")).ToList();
+            // Определение самых популярных возрастных групп для браков
+            string mostCommonMenMarriageGroup = FindMostCommonGroup(menGroups, valuesByGroup);
+            string mostCommonWomenMarriageGroup = FindMostCommonGroup(womenGroups, valuesByGroup);
+
+            // Определение самых популярных возрастных групп для разводов
+            string mostCommonMenDivorceGroup = FindGroupWithHighestTotal(menGroups, totalDivorcesByGroup);
+            string mostCommonWomenDivorceGroup = FindGroupWithHighestTotal(womenGroups, totalDivorcesByGroup);
+
+            // Вывод результатов анализа в интерфейс
+            listBox1.Items.Add($"Чаще всего женились мужчины: {mostCommonMenMarriageGroup}");
+            listBox1.Items.Add($"Чаще всего выходили замуж женщины: {mostCommonWomenMarriageGroup}");
+            listBox1.Items.Add($"Чаще всего разводились мужчины: {mostCommonMenDivorceGroup}");
+            listBox1.Items.Add($"Чаще всего разводились женщины: {mostCommonWomenDivorceGroup}");
+
+           
+
+        }
+        // Находит возрастную группу с наибольшим средним количеством браков за весь период
+        // Используется для определения самой популярной возрастной группы для браков
+        private string FindMostCommonGroup(List<string> groups, Dictionary<string, List<double>> valuesByGroup)
+        {
+            string mostCommonGroup = "";
+            double highestAverage = double.MinValue;
+
+            foreach (string group in groups)
+            {
+                double avg = valuesByGroup[group].Average();
+                if (avg > highestAverage)
+                {
+                    highestAverage = avg;
+                    mostCommonGroup = group;
+                }
+            }
+
+            return mostCommonGroup;
+        }
+        // Находит возрастную группу с наибольшим общим количеством разводов за весь период
+        private string FindGroupWithHighestTotal(List<string> groups, Dictionary<string, int> totalsByGroup)
+        {
+            string highestGroup = "";
+            int highestTotal = int.MinValue;
+
+            foreach (string group in groups)
+            {
+                int total = totalsByGroup[group];
+                if (total > highestTotal)
+                {
+                    highestTotal = total;
+                    highestGroup = group;
+                }
+            }
+
+            return highestGroup;
+        }
+        // Выполняет прогнозирование будущих тенденций браков и разводов на указанное количество лет
+        private void ForecastMarriage(string[] lines, int yearsToForecast)
+        {
+            // Удаляем предыдущие прогнозы с графика
+            foreach (var s in chart1.Series.Cast<Series>().Where(s => s.Name.Contains("(прогноз)")).ToList())
+            {
+                chart1.Series.Remove(s);
+            }
+
+            if (lines == null || lines.Length < 2)
+            {
+                MessageBox.Show("Недостаточно данных для построения прогноза.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            string[] headers = lines[0].Split(',');
+            int smoothing;
+
+            try
+            {
+                smoothing = (int)numericUpDown1.Value;
+            }
+            catch
+            {
+                MessageBox.Show("Некорректное значение сглаживания.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            if (smoothing <= 0)
+            {
+                MessageBox.Show("Сглаживание должно быть положительным числом.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            double globalMin = double.MaxValue;
+            double globalMax = double.MinValue;
+                
+            for (int col = 1; col < headers.Length; col++)
+            {
+                List<double> values;
+                List<int> years;
+
+                try
+                {
+                    values = lines.Skip(1).Select(l => double.Parse(l.Split(',')[col])).ToList();
+                    years = lines.Skip(1).Select(l => int.Parse(l.Split(',')[0])).ToList();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка при чтении данных для {headers[col]}: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    continue;
+                }
+
+                if (smoothing > values.Count)
+                {
+                    MessageBox.Show($"Сглаживание превышает количество данных для {headers[col]}.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    continue;
+                }
+
+                var forecastSeries = new Series
+                {
+                    Name = $"Прогноз {col} (прогноз)",
+                    ChartType = SeriesChartType.Line,
+                    BorderDashStyle = ChartDashStyle.Dash,
+                    Color = Color.Red,
+                    BorderWidth = 2,
+                    LegendText = $"Прогноз {headers[col]}"
+                };
+
+                forecastSeries.Points.AddXY(years.Last(), values.Last());
+                int lastYear = years.Last();
+
+                for (int i = 0; i < yearsToForecast; i++)
+                {
+                    double avg = values.Skip(values.Count - smoothing).Take(smoothing).Average();
+                    values.Add(avg);
+                    forecastSeries.Points.AddXY(lastYear + i + 1, avg);
+                }
+
+                chart1.Series.Add(forecastSeries);
+
+                globalMin = Math.Min(globalMin, values.Min());
+                globalMax = Math.Max(globalMax, values.Max());
+            }
+
+            if (globalMin == double.MaxValue || globalMax == double.MinValue)
+                return;
+
+            double padding = (globalMax - globalMin) * 0.1;
+            chart1.ChartAreas[0].AxisY.Minimum = Math.Floor(globalMin - padding);
+            chart1.ChartAreas[0].AxisY.Maximum = Math.Ceiling(globalMax + padding);
+            chart1.ChartAreas[0].AxisY.Interval = Math.Ceiling((chart1.ChartAreas[0].AxisY.Maximum - chart1.ChartAreas[0].AxisY.Minimum) / 10);
+            chart1.ChartAreas[0].AxisY.IsStartedFromZero = false;
+            chart1.ChartAreas[0].AxisX.Interval = 1;
+            chart1.ChartAreas[0].AxisX.LabelStyle.Angle = -45;
         }
     }
 }
