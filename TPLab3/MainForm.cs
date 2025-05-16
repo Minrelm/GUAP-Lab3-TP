@@ -515,6 +515,12 @@ namespace TPLab3
             string mostCommonMenDivorceGroup = FindGroupWithHighestTotal(menGroups, totalDivorcesByGroup);
             string mostCommonWomenDivorceGroup = FindGroupWithHighestTotal(womenGroups, totalDivorcesByGroup);
 
+
+            listBox1.Items.Add($"Чаще всего женились мужчины: {mostCommonMenMarriageGroup}");
+            listBox1.Items.Add($"Чаще всего выходили замуж женщины: {mostCommonWomenMarriageGroup}");
+            listBox1.Items.Add($"Чаще всего разводились мужчины: {mostCommonMenDivorceGroup}");
+            listBox1.Items.Add($"Чаще всего разводились женщины: {mostCommonWomenDivorceGroup}");
+
            
 
         }
@@ -561,30 +567,7 @@ namespace TPLab3
                 chart1.Series.Remove(s);
             }
 
-            if (lines == null || lines.Length < 2)
-            {
-                MessageBox.Show("Недостаточно данных для построения прогноза.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
 
-            string[] headers = lines[0].Split(',');
-            int smoothing;
-
-            try
-            {
-                smoothing = (int)numericUpDown1.Value;
-            }
-            catch
-            {
-                MessageBox.Show("Некорректное значение сглаживания.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            if (smoothing <= 0)
-            {
-                MessageBox.Show("Сглаживание должно быть положительным числом.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
 
             double globalMin = double.MaxValue;
             double globalMax = double.MinValue;
